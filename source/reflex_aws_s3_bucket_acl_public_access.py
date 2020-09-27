@@ -4,7 +4,7 @@ import json
 import os
 
 import boto3
-from reflex_core import AWSRule
+from reflex_core import AWSRule, subscription_confirmation
 
 
 class S3BucketAclPublicAccess(AWSRule):
@@ -32,8 +32,7 @@ class S3BucketAclPublicAccess(AWSRule):
 
     def is_create_bucket(self):
         if "x-amz-acl" in self.event["detail"]["requestParameters"].keys():
-            for acl in self.event["detail"]["requestParameters"][
-                    "x-amz-acl"]:
+            for acl in self.event["detail"]["requestParameters"]["x-amz-acl"]:
                 if acl in self.non_compliant_acl_list:
                     return False
             return True
@@ -45,18 +44,26 @@ class S3BucketAclPublicAccess(AWSRule):
                 if acl in self.non_compliant_acl_list:
                     return False
             return True
-        if isinstance(self.event["detail"]["requestParameters"][
-                            "AccessControlPolicy"]["AccessControlList"][
-                            "Grant"], list):
+        if isinstance(
+            self.event["detail"]["requestParameters"]["AccessControlPolicy"][
+                "AccessControlList"
+            ]["Grant"],
+            list,
+        ):
             for grant in self.event["detail"]["requestParameters"][
-                    "AccessControlPolicy"]["AccessControlList"]["Grant"]:
+                "AccessControlPolicy"
+            ]["AccessControlList"]["Grant"]:
                 if grant["Grantee"]["xsi:type"] == "Group":
                     return False
-        if isinstance(self.event["detail"]["requestParameters"][
-                            "AccessControlPolicy"]["AccessControlList"][
-                            "Grant"], dict):
-            grant = self.event["detail"]["requestParameters"][
-                "AccessControlPolicy"]["AccessControlList"]["Grant"]
+        if isinstance(
+            self.event["detail"]["requestParameters"]["AccessControlPolicy"][
+                "AccessControlList"
+            ]["Grant"],
+            dict,
+        ):
+            grant = self.event["detail"]["requestParameters"]["AccessControlPolicy"][
+                "AccessControlList"
+            ]["Grant"]
             if grant["Grantee"]["xsi:type"] == "Group":
                 return False
             return True
@@ -64,11 +71,18 @@ class S3BucketAclPublicAccess(AWSRule):
 
     def get_remediation_message(self):
         """ Returns a message about the remediation action that occurred """
-        return f"The S3 bucket {self.bucket_name} contains an ACL that " \
-               f"grants Public Access "
+        return (
+            f"The S3 bucket {self.bucket_name} contains an ACL that "
+            f"grants Public Access "
+        )
 
 
 def lambda_handler(event, _):
     """ Handles the incoming event """
-    rule = S3BucketAclPublicAccess(json.loads(event["Records"][0]["body"]))
+    print(event)
+    event_payload = json.loads(event["Records"][0]["body"])
+    if subscription_confirmation.is_subscription_confirmation(event_payload):
+        subscription_confirmation.confirm_subscription(event_payload)
+        return
+    rule = S3BucketAclPublicAccess(event_payload)
     rule.run_compliance_rule()
