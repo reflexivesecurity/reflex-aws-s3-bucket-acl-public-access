@@ -39,34 +39,26 @@ class S3BucketAclPublicAccess(AWSRule):
         return True
 
     def is_put_bucket_acl(self):
-        if "x-amz-acl" in self.event["detail"]["requestParameters"].keys():
-            for acl in self.event["detail"]["requestParameters"]["x-amz-acl"]:
+        request_parameters = self.event["detail"]["requestParameters"]
+        if "x-amz-acl" in request_parameters.keys():
+            for acl in request_parameters["x-amz-acl"]:
                 if acl in self.non_compliant_acl_list:
                     return False
             return True
-        if isinstance(
-            self.event["detail"]["requestParameters"]["AccessControlPolicy"][
-                "AccessControlList"
-            ]["Grant"],
-            list,
-        ):
-            for grant in self.event["detail"]["requestParameters"][
-                "AccessControlPolicy"
-            ]["AccessControlList"]["Grant"]:
+
+        grant_context = request_parameters["AccessControlPolicy"]["AccessControlList"][
+            "Grant"
+        ]
+
+        if isinstance(grant_context, list):
+            for grant in grant_context:
                 if grant["Grantee"]["xsi:type"] == "Group":
                     return False
-        if isinstance(
-            self.event["detail"]["requestParameters"]["AccessControlPolicy"][
-                "AccessControlList"
-            ]["Grant"],
-            dict,
-        ):
-            grant = self.event["detail"]["requestParameters"]["AccessControlPolicy"][
-                "AccessControlList"
-            ]["Grant"]
-            if grant["Grantee"]["xsi:type"] == "Group":
+
+        if isinstance(grant_context, dict):
+            if grant_context["Grantee"]["xsi:type"] == "Group":
                 return False
-            return True
+
         return True
 
     def get_remediation_message(self):
