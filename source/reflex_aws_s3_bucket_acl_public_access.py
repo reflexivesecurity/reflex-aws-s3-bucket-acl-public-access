@@ -12,12 +12,14 @@ class S3BucketAclPublicAccess(AWSRule):
 
     def __init__(self, event):
         super().__init__(event)
+        self.public_group_uris = [
+            "http://acs.amazonaws.com/groups/global/AllUsers",
+            "http://acs.amazonaws.com/groups/global/AuthenticatedUsers"
+        ]
 
     def extract_event_data(self, event):
         """ Extract required event data """
-        self.event_name = event["detail"]["eventName"]
         self.bucket_name = event["detail"]["requestParameters"]["bucketName"]
-        self.non_compliant_acl_list = ["public-read", "public-read-write"]
 
     def resource_compliant(self):
         """
@@ -25,41 +27,25 @@ class S3BucketAclPublicAccess(AWSRule):
 
         Return True if it is compliant, and False if it is not.
         """
-        if self.event_name == "CreateBucket":
-            return self.is_create_bucket()
-        # if self.event_name == "PutBucketAcl":
-        return self.is_put_bucket_acl()
+        return not self.bucket_has_public_access_acl(self.bucket_name)
 
-    def is_create_bucket(self):
-        if "x-amz-acl" in self.event["detail"]["requestParameters"].keys():
-            for acl in self.event["detail"]["requestParameters"]["x-amz-acl"]:
-                if acl in self.non_compliant_acl_list:
-                    return False
-            return True
-        return True
+    def bucket_has_public_access_acl(self, bucket):
+        """Determines if the specified bucket has an ACL that provides public access.
 
-    def is_put_bucket_acl(self):
-        request_parameters = self.event["detail"]["requestParameters"]
-        if "x-amz-acl" in request_parameters.keys():
-            for acl in request_parameters["x-amz-acl"]:
-                if acl in self.non_compliant_acl_list:
-                    return False
-            return True
+        Args:
+            bucket (string): S3 bucket name
 
-        grant_context = request_parameters["AccessControlPolicy"]["AccessControlList"][
-            "Grant"
-        ]
+        Returns:
+            bool: True if ACL provides public access. False otherwise.
+        """
+        response = self.client.get_bucket_acl(Bucket=bucket)
+        grants = response["Grants"]
 
-        if isinstance(grant_context, list):
-            for grant in grant_context:
-                if grant["Grantee"]["xsi:type"] == "Group":
-                    return False
+        for grant in grants:
+            if grant["Grantee"]["URI"] in self.public_group_uris:
+                return True
 
-        if isinstance(grant_context, dict):
-            if grant_context["Grantee"]["xsi:type"] == "Group":
-                return False
-
-        return True
+        return False
 
     def get_remediation_message(self):
         """ Returns a message about the remediation action that occurred """
