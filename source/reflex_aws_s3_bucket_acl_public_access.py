@@ -14,7 +14,7 @@ class S3BucketAclPublicAccess(AWSRule):
         super().__init__(event)
         self.public_group_uris = [
             "http://acs.amazonaws.com/groups/global/AllUsers",
-            "http://acs.amazonaws.com/groups/global/AuthenticatedUsers"
+            "http://acs.amazonaws.com/groups/global/AuthenticatedUsers",
         ]
 
     def extract_event_data(self, event):
