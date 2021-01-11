@@ -42,7 +42,7 @@ class S3BucketAclPublicAccess(AWSRule):
         grants = response["Grants"]
 
         for grant in grants:
-            if grant["Grantee"]["URI"] in self.public_group_uris:
+            if grant.get("Grantee", {}).get("URI") in self.public_group_uris:
                 return True
 
         return False
